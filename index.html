@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Analizador de Tráfico Sospechoso</title>
+<title>Suspicious Traffic Analyzer</title>
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -80,8 +80,8 @@
 </head>
 <body>
 <header>
-    <h1>Analizador de Tráfico Sospechoso - Expert Mode</h1>
-    <p>Solo se muestran paquetes y patrones críticos, explicaciones y recomendaciones incluidas.</p>
+    <h1>Suspicious Traffic Analyzer - Expert Mode</h1>
+    <p>Only critical packets and patterns are displayed, with explanations and recommended actions.</p>
 </header>
 <main>
     <input type="file" id="csvFile" accept=".csv" />
@@ -89,23 +89,23 @@
     <table id="tablaAlertas">
         <thead>
             <tr>
-                <th># Paquete</th>
-                <th>Hora</th>
-                <th>IP Origen</th>
-                <th>IP Destino</th>
-                <th>Puerto Origen</th>
-                <th>Puerto Destino</th>
-                <th>Protocolo</th>
-                <th>Tamaño</th>
-                <th>Alerta</th>
-                <th>Explicación / Acción</th>
+                <th># Packet</th>
+                <th>Time</th>
+                <th>Source IP</th>
+                <th>Destination IP</th>
+                <th>Source Port</th>
+                <th>Destination Port</th>
+                <th>Protocol</th>
+                <th>Size</th>
+                <th>Alert</th>
+                <th>Explanation / Action</th>
             </tr>
         </thead>
         <tbody></tbody>
     </table>
 </main>
 <footer>
-    Análisis avanzado para empresas de ciberseguridad. Todos los derechos reservados.
+    Advanced analysis for cybersecurity companies. All rights reserved.
 </footer>
 
 <script>
@@ -115,55 +115,52 @@ document.getElementById('csvFile').addEventListener('change', function(e) {
     const reader = new FileReader();
     reader.onload = function(event) {
         const text = event.target.result;
-        analizarCSV(text);
+        analyzeCSV(text);
     };
     reader.readAsText(file);
 });
 
-function analizarCSV(csvText) {
+function analyzeCSV(csvText) {
     const lines = csvText.trim().split('\n');
     const data = lines.map((line, idx) => {
         const [time, src_ip, dst_ip, src_port, dst_port, protocol, length] = line.split(',');
         return {index: idx+1, time, src_ip, dst_ip, src_port, dst_port, protocol, length: parseInt(length)};
     });
 
-    const alertas = [];
-    const ipsRaras = {};
-    const puertoRaro = {};
+    const alerts = [];
+    const suspiciousIPs = {};
+    const suspiciousPorts = {};
     data.forEach(pkt => {
-        let alerta = '';
-        let explicacion = '';
+        let alert = '';
+        let explanation = '';
         // Only mark critical anomalies
-        // Solo marcamos anomalías críticas
         if (!pkt.src_ip || !pkt.dst_ip) {
-            alerta = 'Alto';
-            explicacion = 'Falta IP de origen o destino → tráfico anómalo, posible intento de escaneo o spoofing.';
+            alert = 'High';
+            explanation = 'Missing source or destination IP → anomalous traffic, possible scanning or spoofing attempt.';
         } else if (pkt.length > 1000) {
-            alerta = 'Alto';
-            explicacion = 'Paquete de gran tamaño → posible exfiltración de datos o túnel oculto.';
+            alert = 'High';
+            explanation = 'Large packet size → possible data exfiltration or covert tunneling.';
         } else if (pkt.protocol.includes('TLS') || pkt.protocol.includes('HTTP')) {
-            alerta = 'Medio';
-            explicacion = 'Protocolo seguro inusual o tráfico HTTP raro → posible filtración de datos.';
+            alert = 'Medium';
+            explanation = 'Unusual secure protocol or suspicious HTTP traffic → potential data leakage.';
         } else if (pkt.protocol.includes('ICMP')) {
-            alerta = 'Medio';
-            explicacion = 'Tráfico ICMP → posible reconocimiento de red.';
+            alert = 'Medium';
+            explanation = 'ICMP traffic → possible network reconnaissance.';
         }
 
-        if (alerta) {
-            alertas.push({...pkt, alerta, explicacion});
+        if (alert) {
+            alerts.push({...pkt, alert, explanation});
         }
         // Count for charts
-        // Conteo para gráficas
-        if (pkt.src_ip) ipsRaras[pkt.src_ip] = (ipsRaras[pkt.src_ip]||0)+1;
-        if (pkt.src_port) puertoRaro[pkt.src_port] = (puertoRaro[pkt.src_port]||0)+1;
+        if (pkt.src_ip) suspiciousIPs[pkt.src_ip] = (suspiciousIPs[pkt.src_ip]||0)+1;
+        if (pkt.src_port) suspiciousPorts[pkt.src_port] = (suspiciousPorts[pkt.src_port]||0)+1;
     });
     // Display in table
-    // Mostrar en tabla
     const tbody = document.querySelector('#tablaAlertas tbody');
     tbody.innerHTML = '';
-    alertas.forEach(pkt => {
+    alerts.forEach(pkt => {
         const tr = document.createElement('tr');
-        tr.className = pkt.alerta === 'Alto' ? 'alerta-alta' : 'alerta-media';
+        tr.className = pkt.alert === 'High' ? 'alerta-alta' : 'alerta-media';
         tr.innerHTML = `
             <td>${pkt.index}</td>
             <td>${pkt.time}</td>
@@ -173,21 +170,20 @@ function analizarCSV(csvText) {
             <td>${pkt.dst_port || ''}</td>
             <td>${pkt.protocol}</td>
             <td>${pkt.length}</td>
-            <td>${pkt.alerta}</td>
-            <td>${pkt.explicacion}</td>
+            <td>${pkt.alert}</td>
+            <td>${pkt.explanation}</td>
         `;
         tbody.appendChild(tr);
     });
     // Chart.js charts
-    // Gráficos Chart.js
     const ctx = document.getElementById('graficoSospechoso').getContext('2d');
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: Object.keys(ipsRaras),
+            labels: Object.keys(suspiciousIPs),
             datasets: [{
-                label: 'Paquetes sospechosos por IP',
-                data: Object.values(ipsRaras),
+                label: 'Suspicious packets by IP',
+                data: Object.values(suspiciousIPs),
                 backgroundColor: '#c62828'
             }]
         },
@@ -198,8 +194,8 @@ function analizarCSV(csvText) {
                 tooltip: { mode: 'index', intersect: false }
             },
             scales: {
-                x: { title: { display: true, text: 'IP Origen' } },
-                y: { title: { display: true, text: 'Cantidad de paquetes sospechosos' }, beginAtZero: true }
+                x: { title: { display: true, text: 'Source IP' } },
+                y: { title: { display: true, text: 'Number of suspicious packets' }, beginAtZero: true }
             }
         }
     });
@@ -207,3 +203,4 @@ function analizarCSV(csvText) {
 </script>
 </body>
 </html>
+
