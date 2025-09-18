@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analizador de Tráfico Sospechoso</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body {
+        font-family: 'Roboto', sans-serif;
+        margin: 0;
+        background: #f4f6f8;
+        color: #1a1a1a;
+    }
+    header {
+        background: #0d47a1;
+        color: #fff;
+        padding: 1rem 2rem;
+        text-align: center;
+    }
+    h1 {
+        margin: 0;
+        font-weight: 700;
+    }
+    main {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: auto;
+    }
+    input[type="file"] {
+        display: block;
+        margin: 1rem 0 2rem 0;
+        font-size: 1rem;
+    }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 2rem;
+        background: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    th, td {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 1px solid #e0e0e0;
+    }
+    th {
+        background: #0d47a1;
+        color: #fff;
+    }
+    tr:hover {
+        background: #e3f2fd;
+    }
+    .alerta-alta {
+        background: #ffebee;
+        color: #c62828;
+        font-weight: 700;
+    }
+    .alerta-media {
+        background: #fff3e0;
+        color: #ef6c00;
+        font-weight: 700;
+    }
+    canvas {
+        margin-top: 2rem;
+        background: #fff;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    footer {
+        text-align: center;
+        margin: 2rem 0;
+        color: #666;
+    }
+</style>
+</head>
+<body>
+<header>
+    <h1>Analizador de Tráfico Sospechoso - Expert Mode</h1>
+    <p>Solo se muestran paquetes y patrones críticos, explicaciones y recomendaciones incluidas.</p>
+</header>
+<main>
+    <input type="file" id="csvFile" accept=".csv" />
+    <canvas id="graficoSospechoso" height="200"></canvas>
+    <table id="tablaAlertas">
+        <thead>
+            <tr>
+                <th># Paquete</th>
+                <th>Hora</th>
+                <th>IP Origen</th>
+                <th>IP Destino</th>
+                <th>Puerto Origen</th>
+                <th>Puerto Destino</th>
+                <th>Protocolo</th>
+                <th>Tamaño</th>
+                <th>Alerta</th>
+                <th>Explicación / Acción</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</main>
+<footer>
+    Análisis avanzado para empresas de ciberseguridad. Todos los derechos reservados.
+</footer>
+
+<script>
+document.getElementById('csvFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        const text = event.target.result;
+        analizarCSV(text);
+    };
+    reader.readAsText(file);
+});
+
+function analizarCSV(csvText) {
+    const lines = csvText.trim().split('\n');
+    const data = lines.map((line, idx) => {
+        const [time, src_ip, dst_ip, src_port, dst_port, protocol, length] = line.split(',');
+        return {index: idx+1, time, src_ip, dst_ip, src_port, dst_port, protocol, length: parseInt(length)};
+    });
+
+    const alertas = [];
+    const ipsRaras = {};
+    const puertoRaro = {};
+    data.forEach(pkt => {
+        let alerta = '';
+        let explicacion = '';
+        // Only mark critical anomalies
+        // Solo marcamos anomalías críticas
+        if (!pkt.src_ip || !pkt.dst_ip) {
+            alerta = 'Alto';
+            explicacion = 'Falta IP de origen o destino → tráfico anómalo, posible intento de escaneo o spoofing.';
+        } else if (pkt.length > 1000) {
+            alerta = 'Alto';
+            explicacion = 'Paquete de gran tamaño → posible exfiltración de datos o túnel oculto.';
+        } else if (pkt.protocol.includes('TLS') || pkt.protocol.includes('HTTP')) {
+            alerta = 'Medio';
+            explicacion = 'Protocolo seguro inusual o tráfico HTTP raro → posible filtración de datos.';
+        } else if (pkt.protocol.includes('ICMP')) {
+            alerta = 'Medio';
+            explicacion = 'Tráfico ICMP → posible reconocimiento de red.';
+        }
+
+        if (alerta) {
+            alertas.push({...pkt, alerta, explicacion});
+        }
+        // Count for charts
+        // Conteo para gráficas
+        if (pkt.src_ip) ipsRaras[pkt.src_ip] = (ipsRaras[pkt.src_ip]||0)+1;
+        if (pkt.src_port) puertoRaro[pkt.src_port] = (puertoRaro[pkt.src_port]||0)+1;
+    });
+    // Display in table
+    // Mostrar en tabla
+    const tbody = document.querySelector('#tablaAlertas tbody');
+    tbody.innerHTML = '';
+    alertas.forEach(pkt => {
+        const tr = document.createElement('tr');
+        tr.className = pkt.alerta === 'Alto' ? 'alerta-alta' : 'alerta-media';
+        tr.innerHTML = `
+            <td>${pkt.index}</td>
+            <td>${pkt.time}</td>
+            <td>${pkt.src_ip}</td>
+            <td>${pkt.dst_ip}</td>
+            <td>${pkt.src_port || ''}</td>
+            <td>${pkt.dst_port || ''}</td>
+            <td>${pkt.protocol}</td>
+            <td>${pkt.length}</td>
+            <td>${pkt.alerta}</td>
+            <td>${pkt.explicacion}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+    // Chart.js charts
+    // Gráficos Chart.js
+    const ctx = document.getElementById('graficoSospechoso').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(ipsRaras),
+            datasets: [{
+                label: 'Paquetes sospechosos por IP',
+                data: Object.values(ipsRaras),
+                backgroundColor: '#c62828'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: { mode: 'index', intersect: false }
+            },
+            scales: {
+                x: { title: { display: true, text: 'IP Origen' } },
+                y: { title: { display: true, text: 'Cantidad de paquetes sospechosos' }, beginAtZero: true }
+            }
+        }
+    });
+}
+</script>
+</body>
+</html>
